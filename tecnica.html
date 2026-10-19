@@ -2,12 +2,6 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Técnica">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="icon" type="image/png" href="icon-192.png">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Técnica de cinco minutos</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -93,7 +87,20 @@ h1,h2,h3{font-family:var(--f-display);font-weight:500;text-wrap:balance;margin:0
 .kbwrap{margin-top:14px;overflow-x:auto}
 .kbwrap svg{display:block;max-width:100%;height:auto}
 .kbcap{font-size:.84rem;color:var(--muted);margin-top:4px}
-.notes{font-family:var(--f-display);font-size:1.05rem;margin-top:8px}
+.cadrow{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:8px}
+.cad{margin:0;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:var(--sheet);min-width:0}
+.cad figcaption{font-size:.85rem;margin-bottom:2px}
+.cadlbl{margin-top:14px;font-weight:700}
+.seqwrap{overflow-x:auto;margin-top:12px;border:1px solid var(--line);border-radius:8px;background:var(--sheet)}
+.seq{border-collapse:collapse;font-size:.95rem;text-align:center;white-space:nowrap}
+.seq th{font-size:.72rem;letter-spacing:.06em;padding:4px 8px;position:sticky;left:0;background:var(--sheet);text-align:left}
+.seq th.dir{position:static;text-align:left;color:var(--muted);font-weight:700;border-bottom:1px solid var(--line)}
+.seq td{padding:3px 5px;min-width:2.4em}
+.seq td.b,.seq td[class=""]{}
+.seq td.b{border-left:2px solid var(--line)}
+.seq td.rh,.seq th.rh{color:var(--tec);font-weight:700}
+.seq td.lh,.seq th.lh{color:var(--rep);font-weight:700}
+.seq .ton{font-weight:700;text-decoration:underline;text-underline-offset:3px}
 .record{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px;padding:10px 12px;background:var(--tint);border-radius:var(--r)}
 .record input{width:90px;border:1px solid var(--line);background:var(--sheet);border-radius:8px;padding:6px 8px}
 .section{margin-top:26px}
@@ -205,11 +212,77 @@ function keyboard(notes, rh, lh, opts){
     if(lh) s+=`<text x="${x}" y="${top+H+18}" text-anchor="middle" font-size="13" font-weight="700" fill="var(--rep)" font-family="var(--f-body)">${lh[i]}</text>`; });
   s+=`</svg>`; return s;
 }
-function scaleBlock(title, notes, fing, note){
+// Secuencia completa subiendo y bajando, con la digitación de cada nota.
+// MD: cada octava repite los 7 primeros dedos; la nota más alta lleva el último dedo del patrón.
+// MI: la nota más grave lleva el primer dedo; las tónicas intermedias y la de arriba, el último.
+function fullSeq(notes, fing, octs){
+  const R=fing?fing[0].split(""):null, L=fing?fing[1].split(""):null, n=notes.length-1, up=[];
+  for(let o=0;o<octs;o++) for(let i=0;i<n;i++) up.push({name:notes[i].name, ton:i===0, rh:R?R[i]:"", lh:L?((o===0&&i===0)?L[0]:(i===0?L[n]:L[i])):""});
+  up.push({name:notes[n].name, ton:true, top:true, rh:R?R[n]:"", lh:L?L[n]:""});
+  const down=up.slice(0,-1).reverse();
+  return {up, down};
+}
+function seqTable(notes, fing, octs, per){
+  const q=fullSeq(notes,fing,octs), all=q.up.concat(q.down), nUp=q.up.length;
+  const cell=(x,i,row)=>{ const brk=(i>0 && i%per===0)?' class="b"':''; 
+    if(row==="n") return `<td${brk}><span class="${x.ton?"ton":""}">${x.name}</span></td>`;
+    return `<td class="${row}${i>0&&i%per===0?" b":""}">${row==="rh"?x.rh:x.lh}</td>`; };
+  let h=`<div class="seqwrap"><table class="seq" aria-label="Digitación completa"><thead><tr><th></th><th colspan="${nUp}" class="dir">Sube ↗</th><th colspan="${all.length-nUp}" class="dir">Baja ↘</th></tr></thead><tbody>`;
+  if(fing) h+=`<tr><th class="rh">MD</th>${all.map((x,i)=>cell(x,i,"rh")).join("")}</tr>`;
+  h+=`<tr><th></th>${all.map((x,i)=>cell(x,i,"n")).join("")}</tr>`;
+  if(fing) h+=`<tr><th class="lh">MI</th>${all.map((x,i)=>cell(x,i,"lh")).join("")}</tr>`;
+  return h+`</tbody></table></div><div class="kbcap">Desliza la tabla hacia la derecha para ver toda la escala. ${octs} octavas subiendo y bajando. Las líneas verticales marcan cada pulso (${per} notas por pulso). Al bajar se usan los mismos dedos que al subir, en orden inverso.</div>`;
+}
+function scaleBlock(title, notes, fing, note, octs, per){
   const rh=fing?fing[0].split(""):null, lh=fing?fing[1].split(""):null;
   return `<div class="kbwrap">${keyboard(notes,rh,lh)}</div>
-  <div class="notes">${notes.map(n=>n.name).join(" · ")}</div>
-  <div class="kbcap">${fing?`<b style="color:var(--tec)">Arriba, mano derecha</b> · <b style="color:var(--rep)">abajo, mano izquierda</b> (subiendo una octava). `:""}${note||""}</div>`;
+  <div class="kbcap">${fing?`En el teclado, una octava: <b style="color:var(--tec)">arriba, mano derecha</b> · <b style="color:var(--rep)">abajo, mano izquierda</b>. `:""}${note||""}</div>
+  ${seqTable(notes, fing, octs||2, per||2)}`;
+}
+
+/* ================= CADENCIAS ================= */
+// Teclado genérico de N octavas con marcas {abs, hand:'rh'|'lh', f}
+function kb2(lo, hi, marks){
+  // dibuja solo las teclas entre lo y hi (semitonos absolutos), ajustado a teclas blancas
+  const W=20,H=78,BW=12,BH=48,top=18, whitePcs=[0,2,4,5,7,9,11], isW=p=>whitePcs.includes(((p%12)+12)%12);
+  while(!isW(lo)) lo--; while(!isW(hi)) hi++;
+  const wIdx=p=>Math.floor(p/12)*7+whitePcs.indexOf(p%12), w0=wIdx(lo), nW=wIdx(hi)-w0+1, blackX={1:1,3:2,6:4,8:5,10:6};
+  const by={}; marks.forEach(m=>by[m.abs]=m);
+  const xOf=p=>{ const o=Math.floor(p/12), pc=p%12; return isW(p)? (wIdx(p)-w0)*W+W/2 : (o*7+blackX[pc]-w0)*W; };
+  const col=m=>m.hand==="rh"?"var(--hl-b)":"var(--tonic)";
+  let s=`<svg viewBox="0 0 ${nW*W+2} ${H+top+22}" width="${nW*W+2}" role="img" aria-label="Posición de las manos">`;
+  for(let p=lo;p<=hi;p++) if(isW(p)){ const m=by[p]; s+=`<rect x="${(wIdx(p)-w0)*W+1}" y="${top}" width="${W}" height="${H}" rx="2" fill="${m?col(m):'var(--white-key)'}" stroke="var(--muted)" stroke-width=".7"/>`; }
+  for(let p=lo;p<=hi;p++) if(!isW(p)){ const m=by[p]; s+=`<rect x="${xOf(p)-BW/2+1}" y="${top}" width="${BW}" height="${BH}" rx="2" fill="${m?col(m):'var(--black-key)'}" ${m?'stroke="var(--ink)" stroke-width="1.2"':''}/>`; }
+  marks.forEach(m=>{ const x=xOf(m.abs)+1; if(m.hand==="rh") s+=`<text x="${x}" y="${top-5}" text-anchor="middle" font-size="12" font-weight="700" fill="var(--tec)">${m.f}</text>`;
+    else s+=`<text x="${x}" y="${top+H+16}" text-anchor="middle" font-size="12" font-weight="700" fill="var(--rep)">${m.f}</text>`; });
+  return s+`</svg>`;
+}
+function perms3(a){ return [[a[0],a[1],a[2]],[a[0],a[2],a[1]],[a[1],a[0],a[2]],[a[1],a[2],a[0]],[a[2],a[0],a[1]],[a[2],a[1],a[0]]]; }
+function nearest(cur, pc){ let best=null; for(let k=-2;k<=2;k++){ const c=pc+12*(Math.floor(cur/12)+k); if(best===null||Math.abs(c-cur)<Math.abs(best-cur)||(Math.abs(c-cur)===Math.abs(best-cur)&&c<best)) best=c; } return best; }
+function lead(prev, pcs){ let best=null, bc=1e9; for(const pr of perms3(pcs)){ const v=prev.map((p,i)=>nearest(p,pr[i])); const c=v.reduce((a,x,i)=>a+Math.abs(x-prev[i]),0); if(new Set(v).size===3 && c<bc){bc=c;best=v;} } return best.slice().sort((a,b)=>a-b); }
+function rhFing(v){ const a=v[1]-v[0], b=v[2]-v[1]; if(b<=2) return ["1","4","5"]; if(a<=2) return ["1","2","5"]; if(b===5) return ["1","2","5"]; return ["1","3","5"]; }
+function cadence(L, pc, minor, startInv){
+  const sc=spell(L,pc,minor?INT.armonica:INT.mayor); // grados 0..7
+  const deg=(arr)=>arr.map(i=>sc[i]);
+  const chords=[{n:minor?"i":"I",d:[0,2,4],b:0},{n:minor?"iv":"IV",d:[3,5,0],b:3},{n:"V7",d:[4,6,3],b:4},{n:minor?"i":"I",d:[0,2,4],b:0}];
+  // posición inicial de la derecha (octava central)
+  const root=12+pc, tri=[root, root+(minor?3:4), root+7];
+  let v = startInv===0? tri : startInv===1? [tri[1],tri[2],tri[0]+12] : [tri[2]-12,tri[0],tri[1]];
+  if(v[0]<12) v=v.map(x=>x+12);
+  const lhF=["5","2","1","5"], out=[];
+  chords.forEach((c,i)=>{
+    if(i>0) v=lead(v, c.d.map(j=>sc[j].pc));
+    const bass=pc+(c.b===0?0:(c.b===3?5:7)); // bajo en la octava grave
+    const f=rhFing(v);
+    const names=v.map(a=>{ const s0=sc.find(n=>n.pc===a%12); return s0?s0.name:""; });
+    out.push({n:c.n, marks:v.map((a,k)=>({abs:a,hand:"rh",f:f[k]})).concat([{abs:bass,hand:"lh",f:lhF[i]}]), rh:names, bass:sc[c.b].name});
+  });
+  return out;
+}
+function cadenceHtml(K, minor, inv){
+  const L=minor?K[4]:K[1], pc=minor?K[5]:K[2], c=cadence(L,pc,minor,inv);
+  const all=c.flatMap(x=>x.marks.map(m=>m.abs)), lo=Math.min(...all)-1, hi=Math.max(...all)+1;
+  return `<div class="cadrow">${c.map(x=>`<figure class="cad"><figcaption><b>${x.n}</b> · ${x.rh.join("-")} <span style="color:var(--rep)">/ bajo ${x.bass}</span></figcaption><div class="kbwrap">${kb2(lo,hi,x.marks)}</div></figure>`).join("")}</div>`;
 }
 
 /* ================= PLAN ================= */
@@ -250,13 +323,17 @@ function dayData(w, d){ // d: 0=lunes ... 6=domingo
                  ["Ruleta de escalas menores","3 tonalidades menores al azar, armónicas, 4 octavas."],
                  ["Ruleta de arpegios","Arpegios de 4 tonalidades al azar, mayores y menores."],
                  ["Cadencias de repaso","Cadencia I–IV–V7–I en 4 tonalidades distintas, sin mirar ninguna partitura."],
-                 ["Récord de la fase · escalas","Elige tu escala mayor favorita y busca tu tempo máximo limpio. Anótalo."],
-                 ["Récord de la fase · menores","Elige tu escala menor favorita y busca tu tempo máximo limpio. Anótalo."],
+                 ["Récord de la fase · escalas",`Escala de Do mayor y de la mayor que más te cueste, 4 octavas: a ♩ = ${ph.t1}, luego a ♩ = ${ph.t1+4} y, si sale, a ♩ = ${ph.t1+8}. Anota el tempo más alto limpio.`],
+                 ["Récord de la fase · menores",`Escala de la menor y de la menor que más te cueste, 4 octavas: a ♩ = ${ph.t1-4}, luego a ♩ = ${ph.t1} y, si sale, a ♩ = ${ph.t1+4}. Anota el tempo más alto limpio.`],
                  ["Mini concierto de técnica","Toca para alguien de casa: 1 escala mayor, 1 menor, 1 arpegio y 1 cadencia, sin parar."]][d];
     return Object.assign(out,{title:tasks[0], cat:"Semana de repaso · "+ph.n, steps:["Sacude las manos y suelta los hombros (20 segundos).", tasks[1], "Si alguna sale con tropiezos, tócala una vez más muy lenta y bonita."],
       ok:"Cada escala sale 3 veces seguidas sin tropiezos.", why:"Repasar en orden aleatorio obliga a pensar la tonalidad, no a repetir de memoria motora. Así se fija de verdad.", record:d>=4, scale:null});
   }
   const v=(x)=>Math.max(40,x);
+  // con 2 octavas (7 notas por octava) las semicorcheas no cuadran: corcheas con el metrónomo al doble
+  const C8=(o)=>Object.assign(o,{t:Math.min(200,o.t*2), sub:"2 notas por pulso (corcheas). Con 2 octavas, así la tónica cae siempre en el pulso.", per:2, octs:2});
+  const S16=(o)=>Object.assign(o,{per:4, octs:4});
+  const fit=(o)=> octs===2? C8(o) : S16(o);
   switch(d){
     case 0: { // escala mayor
       let steps=["Sacude las manos y suelta los hombros (20 segundos).",
@@ -265,48 +342,69 @@ function dayData(w, d){ // d: 0=lunes ... 6=domingo
         : ph.n==="Velocidad"? "Después, una vez a tempo más rápido (+8) sin miedo a fallar, y vuelve al tempo de hoy."
         : ph.n==="Dinámica y articulación"? "Repite: subiendo en crescendo de p a f y bajando en diminuendo."
         : "Repite en staccato ligero y después en legato brillante (f)."];
-      return Object.assign(out,{title:"Escala de "+M.name, cat:"Lunes · escala mayor", steps, ok:"3 veces seguidas sin tropiezos y con los hombros sueltos.", why:"La escala mayor es el mapa de la tonalidad: conocerla con los dedos hace que leas y memorices más rápido.", scale:M});}
+      return fit(out) && Object.assign(out,{title:"Escala de "+M.name, cat:"Lunes · escala mayor", steps, ok:"3 veces seguidas sin tropiezos y con los hombros sueltos.", why:"La escala mayor es el mapa de la tonalidad: conocerla con los dedos hace que leas y memorices más rápido.", scale:M});}
     case 1: { // menor
       let steps=["Sacude las manos (20 segundos).",
         `Escala de ${m.name}, ${octs} octavas, ${hands}.`,
         minType==="melodica"? "Recuerda: la melódica sube con 6ª y 7ª elevadas y baja como la menor natural." : "Cuidado con el salto de segunda aumentada entre la 6ª y la 7ª: que no se note el bache."];
-      return Object.assign(out,{title:"Escala de "+K[3], cat:"Martes · escala menor", steps, ok:"Sale 3 veces seguidas sin tropiezos.", why:"Las tonalidades menores son las de la mitad de tu repertorio: Jensen, Abril, Asturias…", scale:m,
-        scaleNote: minType==="melodica"?"Digitación: la misma que la armónica en casi todas; en las tonalidades con negras, confírmala con tu profe.":""});}
+      if(minType==="melodica") m.fing=null;
+      return fit(out) && Object.assign(out,{title:"Escala de "+K[3], cat:"Martes · escala menor", steps, ok:"Sale 3 veces seguidas sin tropiezos.", why:"Las tonalidades menores son las de la mitad de tu repertorio: Jensen, Abril, Asturias…", scale:m,
+        scaleNote: minType==="melodica"?"La melódica baja como la menor natural (sin alterar 6ª y 7ª). Digitación: pídesela a tu profe; en muchas tonalidades coincide con la armónica.":""});}
     case 2: { // arpegios
       const extra = ph.n==="Dinámica y articulación"? ` Añade el arpegio de séptima de dominante de ${M.name}.` : ph.n==="Color y brillo"? " Añade el arpegio de séptima disminuida sobre la sensible de la menor." : "";
       return Object.assign(out,{t:v(t-12), sub:"4 notas por pulso", title:"Arpegios de "+K[0].replace(" mayor","")+" y "+K[3].split(" (")[0], cat:"Miércoles · arpegios",
         steps:["Muñeca suelta: el brazo acompaña a la mano de lado a lado, como una ola.", `Arpegio de ${M.name} y de ${K[3].split(" (")[0]}, ${octs} octavas, ${hands}.`+extra, "El pulgar no golpea: llega a su tecla como si se deslizara."],
-        ok:"El paso del pulgar no se oye.", why:"Los arpegios entrenan la extensión de la mano y los desplazamientos del brazo: lo que necesitas en Asturias y en Abril.", scale:{name:"Notas del acorde",notes:spell(K[1],K[2],INT.mayor).filter((n,i)=>[0,2,4,7].includes(i)),fing:null}});}
+        ok:"El paso del pulgar no se oye.", why:"Los arpegios entrenan la extensión de la mano y los desplazamientos del brazo: lo que necesitas en Asturias y en Abril.", arp:true, scale:{name:"Notas del acorde",notes:spell(K[1],K[2],INT.mayor).filter((n,i)=>[0,2,4,7].includes(i)),fing:null}});}
     case 3: { // acordes
       const inv = ph.n==="Estabilidad"? "en posición fundamental" : "en las tres posiciones (fundamental, 1ª y 2ª inversión)";
       const extra = ph.n==="Dinámica y articulación"||ph.n==="Color y brillo" ? "Haz sonar más la nota de arriba de cada acorde, como si fuera una melodía; el resto, piano." : "Los acordes salen de una caída del brazo, no de empujar con los dedos.";
       return Object.assign(out,{t:v(Math.round(t/2)), sub:"1 acorde por pulso", title:"Cadencia en "+K[0].replace(" mayor","")+" y "+K[3].split(" (")[0], cat:"Jueves · acordes y cadencias",
-        steps:[`Cadencia I–IV–V7–I en ${M.name}, ${inv}, la izquierda con el bajo.`, `La misma en ${K[3].split(" (")[0]}: i–iv–V7–i.`, extra],
-        ok:"Todas las notas del acorde suenan a la vez y sin dureza.", why:"Las cadencias son el esqueleto de la música tonal: si las tienes en las manos, entiendes y memorizas mejor tus obras.", scale:null});}
-    case 4: { // velocidad
-      const step2 = ph.n==="Estabilidad"? "Toca la escala en grupos de 4 notas rápidos con parada en la primera nota del grupo siguiente. Relaja en cada parada."
-        : ph.n==="Velocidad"? ["Ritmo con puntillo (larga-corta) y después al revés (corta-larga). Vuelve al ritmo normal.","Impulsos de 8 notas: una octava de golpe y parada.","Grupos de 3 sobre la escala (acento cada 3 notas): obliga a la mano a no depender del compás.","Tempo alterno: una vez lenta, una a tempo, una +8 y vuelta a tempo."][wInPh%4]
-        : ph.n==="Dinámica y articulación"? "Escala a tempo con acento cada 4 notas, luego cada 3. Los acentos, con el peso del brazo; lo demás, ligero."
-        : "Velocidad de brillo: 2 octavas lo más rápido que salgan limpias, ligero y p. Después a 4 octavas a tu tempo.";
-      return Object.assign(out,{t:v(t+8), title:"Velocidad en "+M.name, cat:"Viernes · velocidad", steps:["Muñeca y hombros sueltos antes de empezar.", step2, "Termina con una escala normal: notarás que va sola."],
-        ok:"Los grupos salen de un solo gesto y la mano queda suelta en las paradas.", why:"La velocidad no se consigue tocando rápido muchas veces, sino pensando en grupos y soltando la tensión entre ellos.", scale:M});}
+        steps:[`Cadencia I–IV–V7–I en ${M.name}, ${inv}: la mano izquierda toca solo el bajo (una nota, en rojo en los dibujos) y la derecha, el acorde de tres notas (en azul).`,
+               "Fíjate en los dibujos: la derecha casi no se mueve. Cada dedo va a la nota más cercana del acorde siguiente, y alguna nota se queda quieta (es la nota común).",
+               `La misma en ${K[3].split(" (")[0]}: i–iv–V7–i.`, extra],
+        ok:"Todas las notas del acorde suenan a la vez y sin dureza.", why:"Las cadencias son el esqueleto de la música tonal: si las tienes en las manos, entiendes y memorizas mejor tus obras.", scale:null, cad:(ph.n==="Estabilidad"?[0]:[0,1,2])});}
+    case 4: { // velocidad: objetivos concretos
+      const two=octs===2, T=x=>two? v(x)*2 : v(x), U=two?"corcheas":"semicorcheas", Q=x=>`♩ = ${T(x)} (${U})`;
+      const goal=t+8;
+      let steps;
+      if(ph.n==="Estabilidad") steps=[
+        `Escala de ${M.name}, ${octs} octavas, una vez a ${Q(t-8)} para calentar.`,
+        `Grupos con parada a ${Q(goal)}: toca ${two?"2":"4"} notas rápidas en un pulso, y en el pulso siguiente te quedas quieta en la nota de llegada, con la mano suelta. Así toda la escala, subiendo y bajando.`,
+        `Escala entera seguida a ${Q(goal)}. Objetivo de hoy: 3 veces limpia.`];
+      else if(ph.n==="Velocidad") steps=[
+        [`Ritmo con puntillo (larga-corta) a ${Q(t)}, luego al revés (corta-larga) a ${Q(t)}.`,`Impulsos de octava a ${Q(goal)}: una octava entera de golpe y parada de un pulso; así todas las octavas.`,`Acento cada 3 notas a ${Q(t)}: la mano no debe depender del compás.`,`Tempo escalonado: una vez a ${Q(t-8)}, otra a ${Q(t)}, otra a ${Q(goal+4)} (un poco más de lo que puedes).`][wInPh%4],
+        `Escala entera a ${Q(goal)}. Objetivo de hoy: 3 veces seguidas limpia.`,
+        `Si a ${Q(goal)} no sale, quédate en ${Q(goal-4)} hasta que salga 3 veces. El viernes que viene, vuelve a intentar el objetivo.`];
+      else if(ph.n==="Dinámica y articulación") steps=[
+        `Escala de ${M.name} a ${Q(t)} con acento en la primera nota de cada pulso.`,
+        `Ahora con acento cada 3 notas, también a ${Q(t)}. Los acentos, con el peso del brazo; lo demás, ligero.`,
+        `Escala entera sin acentos a ${Q(goal)}. Objetivo de hoy: 3 veces limpia.`];
+      else steps=[
+        `Velocidad de brillo: 2 octavas, p y ligero, a ♩ = ${v(goal+8)} en semicorcheas.`,
+        `Después ${octs} octavas a ${Q(goal)}, mf.`,
+        `Objetivo de hoy: las dos cosas 3 veces limpias. Si no sale, baja 4 y no más.`];
+      Object.assign(out,{t:T(goal), sub:`Objetivo de hoy: ${Q(goal)}`, per:two?2:4, octs:octs});
+      return Object.assign(out,{title:"Velocidad en "+M.name, cat:"Viernes · velocidad", steps:["Muñeca y hombros sueltos antes de empezar."].concat(steps),
+        ok:`La escala sale 3 veces seguidas limpia a ${Q(goal)} y la mano sigue suelta.`, why:"La velocidad no se consigue tocando rápido muchas veces, sino pensando en grupos y soltando la tensión entre ellos. Cada viernes el objetivo sube un poco.", scale:M});}
     case 5: { // dinámica / articulación / coordinación
       const step2 = ph.n==="Estabilidad"? `Escala de ${M.name} en movimiento contrario (las manos se separan desde el centro y vuelven), 2 octavas.`
         : ph.n==="Velocidad"? `Movimiento contrario en ${M.name}, 2 octavas, y después la escala a 4 octavas en crescendo continuo.`
         : ph.n==="Dinámica y articulación"? (wInPh%2? `Escala de ${M.name} en terceras: la mano izquierda empieza en la tónica y la derecha una tercera más arriba.` : `Escala de ${M.name} en sextas: la derecha empieza una sexta más arriba que la izquierda.`)
         : `Escala de ${M.name}: mano derecha legato y mano izquierda staccato a la vez; luego al revés.`;
-      return Object.assign(out,{title:"Control en "+M.name, cat:"Sábado · dinámica y coordinación", steps:["Sacude las manos (20 segundos).", step2, "Escucha las dos manos a la vez: ninguna se adelanta."],
+      const o5 = (ph.n==="Estabilidad"||ph.n==="Velocidad")? C8(out) : fit(out);
+      return Object.assign(o5,{title:"Control en "+M.name, cat:"Sábado · dinámica y coordinación", steps:["Sacude las manos (20 segundos).", step2, "Escucha las dos manos a la vez: ninguna se adelanta."],
         ok:"Las dos manos llegan juntas a cada nota.", why:"Coordinar manos distintas y controlar el volumen es lo que convierte una escala en música.", scale:M});}
     case 6: { // especial + récord
       let title, steps, sc=null, why, note="";
       if(ph.n==="Estabilidad"){ title="Escala cromática"; steps=["Escala cromática desde Do, 2 octavas, manos separadas.","Digitación: 3 en las teclas negras, 1 en las blancas, y 2 en Fa y Do (mano derecha subiendo) o en Mi y Si (mano izquierda subiendo).","Busca un sonido igual y muy legato."]; why="La cromática enseña a mover la mano sin saltos: muy útil en Czerny y en los adornos.";
         sc={name:"Cromática",notes:spell(0,0,[1,1,1,1,1,1,1,1,1,1,1,1]).map((n,i)=>Object.assign(n,{name:["Do","Do♯","Re","Re♯","Mi","Fa","Fa♯","Sol","Sol♯","La","La♯","Si","Do"][i]})),fing:["1313123131312","1313213131321"]}; }
-      else if(ph.n==="Velocidad"){ title="Récord de la semana"; steps=["Escala de "+M.name+", 4 octavas, manos juntas.","Busca el tempo más rápido al que te salga 3 veces limpia y relajada. Empieza en el tempo de hoy y sube de 4 en 4.","Anota tu récord abajo."]; why="Medir te permite ver tu progreso semana a semana."; sc=M; }
+      else if(ph.n==="Velocidad"){ title="Prueba de récord"; steps=["Escala de "+M.name+", 4 octavas, manos juntas, una vez a ♩ = "+t+" para calentar.","Prueba de récord a ♩ = "+(t+12)+" en semicorcheas: tiene que salir 3 veces seguidas limpia y relajada.","Si lo consigues, un intento final a ♩ = "+(t+16)+". Anota abajo el tempo más alto que te haya salido limpio."]; why="Medir te permite ver tu progreso semana a semana."; sc=M; out.t=t+12; }
       else if(ph.n==="Dinámica y articulación"){ const md=MODES[(wInPh-1)%6]; title=md[0]; sc={name:md[0],notes:spell(md[2],md[3],INT[md[1]]),fing:[WHITE,WHITEL]};
         steps=[`Escala de ${md[0]} (solo teclas blancas), 2 octavas, manos juntas.`, md[4], (wInPh>6? "Improvisa 1 minuto con esas notas: deja que el modo te cuente cómo suena." : "Tócala lenta y escucha qué la hace distinta de la mayor y de la menor.")]; why="Los modos son la puerta a la música española, al impresionismo y al jazz."; }
       else { const sp=SPECIAL4[(wInPh-1)%5]; title=sp[0];
         if(sp[1]==="frigiodom"){ sc={name:sp[0],notes:spell(sp[2],sp[3],INT.frigiodom),fing:null}; }
         steps=[`${sp[0]}: tócala 2 octavas, manos juntas, primero lenta.`, sp[4], "Después, 1 minuto de improvisación con esas notas."]; why="Cada escala especial es un color nuevo para tus manos y para tu oído."; }
+      if(ph.n==="Estabilidad") Object.assign(out,{per:4,octs:2}); else if(ph.n==="Velocidad") S16(out); else C8(out);
       return Object.assign(out,{title, cat:"Domingo · escala especial y récord", steps, ok:"Te sale con sonido igual y la reconoces con los ojos cerrados.", why, scale:sc, record:true});}
   }
 }
@@ -345,7 +443,9 @@ function renderHoy(){
    <ol class="steps">${x.steps.map(s=>`<li>${esc(s)}</li>`).join("")}</ol>
    <div class="row"><span class="metro-pill"><span>Metrónomo:</span><span class="mv num">♩ = ${x.t}</span><button class="play" id="play">▶ Poner</button></span><span class="small">${esc(x.sub)}</span></div>
    <div class="small" style="margin-top:4px">Si no sale limpio, baja el metrónomo hasta que salga. Mejor lento y perfecto que rápido y sucio.</div>
-   ${x.scale?scaleBlock(x.scale.name,x.scale.notes,x.scale.fing,x.scaleNote):""}
+   ${x.cad?x.cad.map(inv=>`<div class="cadlbl">${["Empezando en posición fundamental","Empezando en 1ª inversión","Empezando en 2ª inversión"][inv]} · ${esc(x.key[0])}</div>${cadenceHtml(x.key,false,inv)}<div class="cadlbl" style="margin-top:8px">${esc(x.key[3].split(" (")[0])}</div>${cadenceHtml(x.key,true,inv)}`).join("")+`<div class="kbcap">Números azules: dedos de la mano derecha. Números rojos: dedo de la mano izquierda para el bajo (5–2–1–5). En el V7 la derecha toca tres notas del acorde de séptima (sin la quinta), como se hace en las cadencias de teclado.</div>`:""}
+   ${x.arp?`<div class="kbwrap">${keyboard(x.scale.notes,null,null)}</div><div class="kbcap">Notas del arpegio de ${esc(x.key[0])}. La digitación depende de la tonalidad: tu profe te dirá la suya.</div>`:""}
+   ${x.scale&&!x.arp?scaleBlock(x.scale.name,x.scale.notes,x.scale.fing,x.scaleNote,x.octs||2,x.per||4):""}
    <div class="ok">${ICON.replace('width="18" height="18"','width="16" height="16"')}<span><span class="lbl">Lo has conseguido si: </span>${esc(x.ok)}</span></div>
    <div class="why">${esc(x.why)}</div>
    ${x.record?`<div class="record"><label for="rec"><b>Récord de la semana ${w}</b> (♩ semicorcheas):</label><input id="rec" type="number" min="30" max="200" value="${esc(ST.rec[w]||"")}" placeholder="—"><span class="small" id="recok"></span></div>`:""}
